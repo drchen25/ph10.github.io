@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>物理引擎1.0版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        canvas { border: 1px solid #333; background: #f0f9ff; }
+        #controls {
+            position: fixed; top:10px; left:10px;
+            background: rgba(255,255,255,0.8); padding:10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button onclick="addBox()">木箱</button>
+        <button onclick="addBall()">钢球</button>
+        <button onclick="addCompound()">复合体</button>
+        <label>重力: <input type="range" id="gravity" min="0" max="2" step="0.1" value="0.8"></label>
+    </div>
+    <canvas id="canvas"></canvas>
+
+<script>
+const { Engine, Render, World, Bodies, Body, Composite, MouseConstraint } = Matter;
+const engine = Engine.create();
+const render = Render.create({
+    element: document.body,
+    engine: engine,
+    canvas: document.getElementById('canvas'),
+    options: {
+        width: 800,
+        height: 600,
+        wireframes: false,
+        showAngleIndicator: true
+    }
+});
+
+// 物理边界[4](@ref)
+const boundaries = [
+    Bodies.rectangle(400, 605, 810, 40, { isStatic: true }),  // 地面
+    Bodies.rectangle(-5, 300, 10, 600, { isStatic: true }),    // 左墙
+    Bodies.rectangle(805, 300, 10, 600, { isStatic: true })     // 右墙
+];
+World.add(engine.world, boundaries);
+
+// 物体创建系统[9](@ref)
+function addBox() {
+    const box = Bodies.rectangle(100, 50, 80, 80, {
+        restitution: 0.3,
+        friction: 0.8,
+        density: 0.001,
+        render: { fillStyle: '#8b4513' }
+    });
+    World.add(engine.world, box);
+}
+
+function addBall() {
+    const ball = Bodies.circle(600, 50, 30, {
+        restitution: 0.9,
+        friction: 0.1,
+        density: 0.008,
+        render: { fillStyle: '#adb5bd' }
+    });
+    World.add(engine.world, ball);
+}
+
+// 复合物体[9](@ref)
+function addCompound() {
+    const compound = Body.create({
+        parts: [
+            Bodies.rectangle(200, 200, 100, 20),
+            Bodies.circle(200, 170, 15)
+        ],
+        render: { fillStyle: '#FFD700' }
+    });
+    World.add(engine.world, compound);
+}
+
+// 鼠标拖拽系统[1,8](@ref)
+const mouse = Matter.Mouse.create(render.canvas);
+const mouseConstraint = MouseConstraint.create(engine, {
+    mouse: mouse,
+    constraint: {
+        stiffness: 0.2,
+        render: { visible: false }
+    }
+});
+World.add(engine.world, mouseConstraint);
+
+// 拖拽可视化反馈
+let isDragging = false;
+Matter.Events.on(mouseConstraint, 'startdrag', () => {
+    isDragging = true;
+    mouseConstraint.body.render.fillStyle = '#FFA500';
+});
+
+Matter.Events.on(mouseConstraint, 'enddrag', () => {
+    isDragging = false;
+    mouseConstraint.body.render.fillStyle = mouseConstraint.body.render.originalColor;
+});
+
+// 重力实时调节[4](@ref)
+document.getElementById('gravity').addEventListener('input', function(e) {
+    engine.gravity.y = parseFloat(e.target.value);
+});
+
+// 碰撞检测[2](@ref)
+Matter.Events.on(engine, 'collisionStart', event => {
+    event.pairs.forEach(pair => {
+        const force = pair.collision.depth * 100;
+        console.log(`碰撞力: ${force.toFixed(2)}N`);
+    });
+});
+
+// 性能优化[4](@ref)
+engine.enableSleeping = true;
+engine.positionIterations = 6;
+
+// 启动系统
+Engine.run(engine);
+Render.run(render);
+</script>
+</body>
+</html>
